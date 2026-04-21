@@ -6,6 +6,7 @@ REPO_SLUG="${REPO_SLUG:-}"
 REPO_URL="${REPO_URL:-}"
 VERSION="${VERSION:-latest}"
 INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/bin}"
+FORCE_SOURCE="${FORCE_SOURCE:-false}"
 TMP_DIR=""
 
 cleanup() {
@@ -217,9 +218,13 @@ install_from_source() {
 
 say "Installing ${PACKAGE_NAME}"
 
-if install_from_release; then
+if [[ "${FORCE_SOURCE}" != "true" ]] && install_from_release; then
   exit 0
 fi
 
-say "Falling back to source install"
+if [[ "${FORCE_SOURCE}" == "true" ]]; then
+  say "Skipping release download and forcing source install"
+else
+  say "Falling back to source install"
+fi
 install_from_source

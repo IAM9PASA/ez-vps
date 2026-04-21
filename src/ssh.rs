@@ -26,6 +26,7 @@ impl SshClient {
     }
 
     pub async fn run(&self, command: &str) -> Result<String> {
+        let remote_command = format!("sh -lc {}", shell_quote(command));
         let output = Command::new("ssh")
             .arg("-i")
             .arg(&self.server.ssh_key)
@@ -36,9 +37,7 @@ impl SshClient {
             .arg("-o")
             .arg("StrictHostKeyChecking=accept-new")
             .arg(self.server.destination())
-            .arg("sh")
-            .arg("-lc")
-            .arg(command)
+            .arg(remote_command)
             .stdin(Stdio::null())
             .output()
             .await
@@ -99,4 +98,8 @@ fn parse_os_release(contents: &str) -> String {
 
 fn unquote_os_release_value(value: &str) -> String {
     value.trim().trim_matches('"').to_string()
+}
+
+fn shell_quote(value: &str) -> String {
+    format!("'{}'", value.replace('\'', r"'\''"))
 }

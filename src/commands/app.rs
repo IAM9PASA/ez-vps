@@ -56,8 +56,8 @@ async fn add(config_path: PathBuf, args: AppAddArgs) -> Result<()> {
     if dry_run {
         print_action("Dry run: app mapping was not saved.");
     } else {
-        config.save(&config_path)?;
         apply_proxy(&server_snapshot).await?;
+        config.save(&config_path)?;
         print_success("App mapping saved and proxy config applied.");
     }
 
@@ -124,8 +124,8 @@ async fn remove(config_path: PathBuf, args: AppRemoveArgs) -> Result<()> {
     if dry_run {
         print_action("Dry run: app mapping was not removed.");
     } else {
-        config.save(&config_path)?;
         apply_proxy(&server_snapshot).await?;
+        config.save(&config_path)?;
         print_success("App mapping removed and proxy config applied.");
     }
 

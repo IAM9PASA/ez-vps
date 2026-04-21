@@ -66,6 +66,14 @@ impl Config {
             .ok_or_else(|| anyhow::anyhow!("server '{name}' was not found in config"))
     }
 
+    pub fn upsert_server(&mut self, server: Server) {
+        if let Some(existing) = self.servers.iter_mut().find(|item| item.name == server.name) {
+            *existing = server;
+        } else {
+            self.servers.push(server);
+        }
+    }
+
     pub fn save(&self, path: &Path) -> Result<()> {
         let raw = toml::to_string_pretty(self).context("failed to serialize config to TOML")?;
 
@@ -85,6 +93,14 @@ impl Config {
 impl Server {
     pub fn destination(&self) -> String {
         format!("{}@{}", self.user, self.host)
+    }
+
+    pub fn upsert_app(&mut self, app: App) {
+        if let Some(existing) = self.apps.iter_mut().find(|item| item.domain == app.domain) {
+            *existing = app;
+        } else {
+            self.apps.push(app);
+        }
     }
 }
 

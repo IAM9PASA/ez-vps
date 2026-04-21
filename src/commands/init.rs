@@ -21,7 +21,7 @@ pub async fn run(config_path: PathBuf, args: ServerArgs) -> Result<()> {
     let interactive = args.server.is_none();
     let config_exists = config_path.exists();
 
-    let config = if config_exists {
+    let mut config = if config_exists {
         Config::load(&config_path)?
     } else if interactive {
         print_action("No config found. We'll create one during setup.");
@@ -38,14 +38,6 @@ pub async fn run(config_path: PathBuf, args: ServerArgs) -> Result<()> {
     }
 
     let options = collect_init_options(&config, args.server.as_deref(), interactive)?;
-
-    if !config_exists && interactive {
-        let new_config = Config {
-            servers: vec![options.server.clone()],
-        };
-        new_config.save(&config_path)?;
-        print_success(&format!("Created config at {}", config_path.display()));
-    }
 
     print_init_summary(&options);
     print_planned_commands(&options);
@@ -83,10 +75,34 @@ pub async fn run(config_path: PathBuf, args: ServerArgs) -> Result<()> {
     };
 
     execute_base_setup(&ssh, &options, proxy_type).await?;
+    persist_successful_init(&mut config, &config_path, &options, proxy_type)?;
 
     print_success("Server initialized successfully.");
     print_kv("server", &options.server.name);
     print_kv("distro", &distro);
+
+    Ok(())
+}
+
+fn persist_successful_init(
+    config: &mut Config,
+    config_path: &std::path::Path,
+    options: &crate::ui::prompts::InitOptions,
+    proxy_type: Option<ProxyType>,
+) -> Result<()> {
+    let mut server = options.server.clone();
+
+    if let (Some(proxy_type), Some(proxy_config)) = (proxy_type, options.proxy_config.as_ref()) {
+        server.upsert_app(App {
+            domain: proxy_config.domain.clone(),
+            upstream_port: proxy_config.upstream_port,
+            proxy: proxy_type,
+        });
+    }
+
+    config.upsert_server(server);
+    config.save(config_path)?;
+    print_success(&format!("Saved config to {}", config_path.display()));
 
     Ok(())
 }
