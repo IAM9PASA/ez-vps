@@ -1,0 +1,11 @@
+[[servers]]
+name = "prod-1"
+host = "1.2.3.4"
+user = "root"
+port = 22
+ssh_key = "/home/you/.ssh/id_ed25519"
+
+[[servers.apps]]
+domain = "api.example.com"
+upstream_port = 3000
+proxy = "caddy"
