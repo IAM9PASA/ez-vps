@@ -1,28 +1,28 @@
 # ez-vps
 
-`ez-vps` is a Rust CLI for setting up and managing a small VPS over SSH.
+`ez-vps` is a Rust CLI for bootstrapping and managing a small VPS over SSH.
 
-It is designed for the common solo-builder workflow:
+It focuses on the common solo-builder flow:
 
 - initialize a server
 - install Docker
 - install Caddy or Nginx
 - configure a basic firewall
-- add and remove app proxy mappings like `api.example.com -> 3000`
+- add and remove reverse proxy mappings like `api.example.com -> 3000`
 - run health checks against the box
 
-## Current commands
+## What works now
 
 ### `ez-vps init`
 
-Interactive setup for:
+Interactive server setup for:
 
 - base packages
 - optional Docker
 - Caddy or Nginx
-- basic firewall rules
+- firewall rules
 
-Use dry run to preview changes:
+Preview changes first:
 
 ```bash
 ez-vps init --server prod-1 --dry-run
@@ -30,7 +30,7 @@ ez-vps init --server prod-1 --dry-run
 
 ### `ez-vps app add`
 
-Add a new reverse proxy mapping and apply it on the server.
+Add a reverse proxy mapping and apply it on the server.
 
 ```bash
 ez-vps app add --server prod-1 --domain api.example.com --upstream-port 3000 --proxy caddy
@@ -38,7 +38,7 @@ ez-vps app add --server prod-1 --domain api.example.com --upstream-port 3000 --p
 
 ### `ez-vps app list`
 
-Show saved app mappings for a server.
+List saved app mappings for a server.
 
 ```bash
 ez-vps app list --server prod-1
@@ -46,7 +46,7 @@ ez-vps app list --server prod-1
 
 ### `ez-vps app remove`
 
-Remove a proxy mapping and re-apply the proxy config.
+Remove a saved mapping and re-apply the proxy config.
 
 ```bash
 ez-vps app remove --server prod-1 --domain api.example.com
@@ -66,6 +66,13 @@ Verify:
 ```bash
 ez-vps check --server prod-1
 ```
+
+## Current limitations
+
+- Ubuntu-style `apt` setup is the main supported path right now.
+- `deploy` and `status` are still scaffolded and not feature-complete.
+- A local `ssh` client must be available on the machine running `ez-vps`.
+- Mixing Caddy and Nginx app mappings on the same server is not supported yet.
 
 ## Config
 
@@ -93,22 +100,24 @@ upstream_port = 3000
 proxy = "caddy"
 ```
 
-`servers.toml` is ignored by git so you do not accidentally commit real server details.
+`servers.toml` is gitignored so real server details do not get committed by accident.
 
 ## Install
 
 ### Quick install
 
+If the repository is public and release assets are published:
+
 ```bash
-curl -fsSL https://raw.githubusercontent.com/<your-user>/ez-vps/main/install.sh | REPO_SLUG=<your-user>/ez-vps bash
+curl -fsSL https://raw.githubusercontent.com/IAM9PASA/ez-vps/main/install.sh | REPO_SLUG=IAM9PASA/ez-vps bash
 ```
 
-The installer now works like this:
+The installer:
 
 - tries to download a prebuilt GitHub release binary first
 - falls back to building from source if no release asset is available
 
-Expected release asset naming:
+Expected release asset names:
 
 ```txt
 ez-vps-x86_64-unknown-linux-gnu.tar.gz
@@ -117,16 +126,12 @@ ez-vps-x86_64-apple-darwin.tar.gz
 ez-vps-aarch64-apple-darwin.tar.gz
 ```
 
-Until the repo is on GitHub, or until you publish release assets, you can run the installer locally:
+If the repository is private, public `curl` install will not work without authentication. In that case, clone the repo or run the installer locally.
+
+### Local install
 
 ```bash
 bash install.sh
-```
-
-Or install from the GitHub repo source directly:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/<your-user>/ez-vps/main/install.sh | REPO_SLUG=<your-user>/ez-vps bash
 ```
 
 ### Manual install
@@ -136,45 +141,25 @@ cargo build --release
 ./target/release/ez-vps --help
 ```
 
-## Notes
+## GitHub Actions release flow
 
-- The current implementation assumes Ubuntu-style package management with `apt`.
-- `deploy` and `status` are still scaffolded and not feature-complete yet.
-- A local `ssh` client must be available on the machine running `ez-vps`.
+The release workflow lives in `.github/workflows/release.yml`.
 
-## Publish To GitHub
-
-This directory is already a git repo. To connect it to GitHub:
-
-```bash
-git add .
-git commit -m "Initial ez-vps scaffold"
-git branch -M main
-git remote add origin git@github.com:<your-user>/ez-vps.git
-git push -u origin main
-```
-
-To make the installer use prebuilt binaries, publish GitHub release assets with the filenames listed above.
-
-## Git Order
-
-Yes, you should make the initial commit before expecting GitHub Actions to do anything useful.
-
-Recommended order:
-
-```bash
-git add .
-git commit -m "Initial ez-vps scaffold"
-git branch -M main
-git remote add origin git@github.com:<your-user>/ez-vps.git
-git push -u origin main
-```
-
-Then create a release tag to trigger the workflow:
+It runs on pushed tags matching `v*`, for example:
 
 ```bash
 git tag v0.1.0
 git push origin v0.1.0
 ```
 
-That tag will trigger `.github/workflows/release.yml` and upload release archives for the installer to use.
+That workflow builds release archives for Linux and macOS and uploads them to the GitHub release so `install.sh` can use them.
+
+## Development
+
+Common local commands:
+
+```bash
+cargo check
+cargo run -- --help
+cargo run -- init --server prod-1 --dry-run
+```
