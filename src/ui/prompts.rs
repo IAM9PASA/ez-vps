@@ -92,6 +92,10 @@ fn select_server(
 fn prompt_ad_hoc_server() -> Result<Server> {
     let theme = ColorfulTheme::default();
 
+    let name: String = Input::with_theme(&theme)
+        .with_prompt("Server name")
+        .default("prod-1".into())
+        .interact_text()?;
     let host: String = Input::with_theme(&theme)
         .with_prompt("Host")
         .interact_text()?;
@@ -108,7 +112,7 @@ fn prompt_ad_hoc_server() -> Result<Server> {
         .interact_text()?;
 
     Ok(Server {
-        name: "ad-hoc".into(),
+        name,
         host,
         user,
         port,

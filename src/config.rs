@@ -68,6 +68,15 @@ impl Config {
 
     pub fn save(&self, path: &Path) -> Result<()> {
         let raw = toml::to_string_pretty(self).context("failed to serialize config to TOML")?;
+
+        if let Some(parent) = path.parent() {
+            if !parent.as_os_str().is_empty() {
+                fs::create_dir_all(parent).with_context(|| {
+                    format!("failed to create config directory {}", parent.display())
+                })?;
+            }
+        }
+
         fs::write(path, raw)
             .with_context(|| format!("failed to write config file to {}", path.display()))
     }

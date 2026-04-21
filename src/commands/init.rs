@@ -18,14 +18,34 @@ use crate::{
 
 pub async fn run(config_path: PathBuf, args: ServerArgs) -> Result<()> {
     print_action(&format!("Loading config from {}", config_path.display()));
-    let config = Config::load(&config_path)?;
     let interactive = args.server.is_none();
+    let config_exists = config_path.exists();
+
+    let config = if config_exists {
+        Config::load(&config_path)?
+    } else if interactive {
+        print_action("No config found. We'll create one during setup.");
+        Config::default()
+    } else {
+        bail!(
+            "config file {} was not found. Run `ez-vps init` interactively first or pass a valid --config path",
+            config_path.display()
+        );
+    };
 
     if !config.servers.is_empty() {
         config.validate()?;
     }
 
     let options = collect_init_options(&config, args.server.as_deref(), interactive)?;
+
+    if !config_exists && interactive {
+        let new_config = Config {
+            servers: vec![options.server.clone()],
+        };
+        new_config.save(&config_path)?;
+        print_success(&format!("Created config at {}", config_path.display()));
+    }
 
     print_init_summary(&options);
     print_planned_commands(&options);
