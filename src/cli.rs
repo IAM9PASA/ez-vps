@@ -16,6 +16,7 @@ pub struct Cli {
 pub enum Commands {
     Init(ServerArgs),
     Check(ServerArgs),
+    Version(VersionArgs),
     App {
         #[command(subcommand)]
         command: AppCommands,
@@ -71,6 +72,12 @@ pub struct AppRemoveArgs {
 
     #[arg(long)]
     pub domain: Option<String>,
+}
+
+#[derive(Debug, clap::Args)]
+pub struct VersionArgs {
+    #[arg(long, default_value_t = false)]
+    pub check_latest: bool,
 }
 
 #[derive(Debug, Clone, Copy, clap::ValueEnum)]
