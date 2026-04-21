@@ -24,6 +24,55 @@ say() {
   echo "==> $*"
 }
 
+detect_profile() {
+  if [[ -n "${PROFILE_FILE:-}" ]]; then
+    echo "${PROFILE_FILE}"
+    return 0
+  fi
+
+  if [[ -n "${ZSH_VERSION:-}" ]]; then
+    echo "${HOME}/.zshrc"
+    return 0
+  fi
+
+  if [[ -f "${HOME}/.bashrc" ]]; then
+    echo "${HOME}/.bashrc"
+    return 0
+  fi
+
+  if [[ -f "${HOME}/.profile" ]]; then
+    echo "${HOME}/.profile"
+    return 0
+  fi
+
+  echo "${HOME}/.bashrc"
+}
+
+ensure_path() {
+  case ":$PATH:" in
+    *":${INSTALL_DIR}:"*)
+      return 0
+      ;;
+  esac
+
+  local profile_file export_line
+  profile_file="$(detect_profile)"
+  export_line="export PATH=\"${INSTALL_DIR}:\$PATH\""
+
+  mkdir -p "$(dirname "${profile_file}")"
+  touch "${profile_file}"
+
+  if ! grep -Fqx "${export_line}" "${profile_file}"; then
+    printf '\n%s\n' "${export_line}" >> "${profile_file}"
+    say "Added ${INSTALL_DIR} to PATH in ${profile_file}"
+  else
+    say "${INSTALL_DIR} is already configured in ${profile_file}"
+  fi
+
+  echo "Run this to use ez-vps in the current shell:"
+  echo "source \"${profile_file}\""
+}
+
 detect_target() {
   local os arch
   os="$(uname -s)"
@@ -73,15 +122,7 @@ install_binary() {
   chmod +x "${INSTALL_DIR}/${PACKAGE_NAME}"
 
   say "Installed to ${INSTALL_DIR}/${PACKAGE_NAME}"
-
-  case ":$PATH:" in
-    *":${INSTALL_DIR}:"*) ;;
-    *)
-      say "${INSTALL_DIR} is not in PATH"
-      echo "Add this line to your shell profile:"
-      echo "export PATH=\"${INSTALL_DIR}:\$PATH\""
-      ;;
-  esac
+  ensure_path
 
   say "Done"
   echo "Run: ${PACKAGE_NAME} --help"

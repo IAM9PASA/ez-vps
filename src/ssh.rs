@@ -55,9 +55,8 @@ impl SshClient {
     }
 
     pub async fn detect_distro(&self) -> Result<String> {
-        let distro = self
-            .run(". /etc/os-release && printf '%s %s' \"$ID\" \"$VERSION_ID\"")
-            .await?;
+        let os_release = self.run("cat /etc/os-release").await?;
+        let distro = parse_os_release(&os_release);
 
         if distro.is_empty() {
             bail!("remote distro detection returned an empty result");
@@ -74,4 +73,30 @@ impl SshClient {
 
         self.run(&command).await.map(|_| ())
     }
+}
+
+fn parse_os_release(contents: &str) -> String {
+    let mut id = None;
+    let mut version_id = None;
+    let mut pretty_name = None;
+
+    for line in contents.lines() {
+        if let Some(value) = line.strip_prefix("ID=") {
+            id = Some(unquote_os_release_value(value));
+        } else if let Some(value) = line.strip_prefix("VERSION_ID=") {
+            version_id = Some(unquote_os_release_value(value));
+        } else if let Some(value) = line.strip_prefix("PRETTY_NAME=") {
+            pretty_name = Some(unquote_os_release_value(value));
+        }
+    }
+
+    match (id, version_id, pretty_name) {
+        (Some(id), Some(version_id), _) => format!("{id} {version_id}"),
+        (_, _, Some(pretty_name)) => pretty_name,
+        _ => String::new(),
+    }
+}
+
+fn unquote_os_release_value(value: &str) -> String {
+    value.trim().trim_matches('"').to_string()
 }

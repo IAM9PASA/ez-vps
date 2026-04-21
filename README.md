@@ -116,6 +116,7 @@ The installer:
 
 - tries to download a prebuilt GitHub release binary first
 - falls back to building from source if no release asset is available
+- adds `~/.local/bin` to your shell profile if needed
 
 Expected release asset names:
 
