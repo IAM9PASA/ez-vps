@@ -54,8 +54,7 @@ pub async fn run(config_path: PathBuf, args: ServerArgs) -> Result<()> {
             let reachable = ssh.run(&command).await.unwrap_or_default();
             print_kv(
                 &format!("app {}", app.domain),
-                if reachable.contains("200") || reachable.contains("301") || reachable.contains("302")
-                {
+                if is_successful_probe_response(&reachable) {
                     "reachable"
                 } else {
                     "not reachable"
@@ -72,6 +71,14 @@ async fn check_command(ssh: &SshClient, command: &str) -> bool {
     ssh.run(command).await.is_ok()
 }
 
+fn is_successful_probe_response(response: &str) -> bool {
+    response
+        .split_whitespace()
+        .find_map(|token| token.parse::<u16>().ok())
+        .map(|status| matches!(status, 200..=399))
+        .unwrap_or(false)
+}
+
 fn proxy_types_for_server(server: &crate::config::Server) -> Vec<ProxyType> {
     let mut proxies = Vec::new();
 
@@ -86,4 +93,19 @@ fn proxy_types_for_server(server: &crate::config::Server) -> Vec<ProxyType> {
     }
 
     proxies
+}
+
+#[cfg(test)]
+mod tests {
+    use super::is_successful_probe_response;
+
+    #[test]
+    fn accepts_redirect_responses() {
+        assert!(is_successful_probe_response("HTTP/1.1 308 Permanent Redirect"));
+    }
+
+    #[test]
+    fn rejects_server_errors() {
+        assert!(!is_successful_probe_response("HTTP/1.1 502 Bad Gateway"));
+    }
 }

@@ -18,6 +18,10 @@ pub struct Server {
     pub port: u16,
     pub ssh_key: String,
     #[serde(default)]
+    pub managed_docker: bool,
+    #[serde(default)]
+    pub managed_proxy: Option<ProxyType>,
+    #[serde(default)]
     pub apps: Vec<App>,
 }
 
@@ -67,7 +71,11 @@ impl Config {
     }
 
     pub fn upsert_server(&mut self, server: Server) {
-        if let Some(existing) = self.servers.iter_mut().find(|item| item.name == server.name) {
+        if let Some(existing) = self
+            .servers
+            .iter_mut()
+            .find(|item| item.name == server.name)
+        {
             *existing = server;
         } else {
             self.servers.push(server);
@@ -101,6 +109,11 @@ impl Server {
         } else {
             self.apps.push(app);
         }
+    }
+
+    pub fn effective_proxy(&self) -> Option<ProxyType> {
+        self.managed_proxy
+            .or_else(|| self.apps.first().map(|app| app.proxy))
     }
 }
 

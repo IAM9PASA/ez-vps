@@ -30,8 +30,13 @@ async fn add(config_path: PathBuf, args: AppAddArgs) -> Result<()> {
     {
         let server = config.find_server_mut(&server_name)?;
         app = collect_app_args(server, &args)?;
+        validate_upstream_port(app.upstream_port)?;
 
-        if server.apps.iter().any(|existing| existing.domain == app.domain) {
+        if server
+            .apps
+            .iter()
+            .any(|existing| existing.domain == app.domain)
+        {
             bail!(
                 "an app for domain '{}' already exists on server '{}'",
                 app.domain,
@@ -49,6 +54,7 @@ async fn add(config_path: PathBuf, args: AppAddArgs) -> Result<()> {
             }
         }
 
+        server.managed_proxy = Some(app.proxy);
         server.apps.push(app.clone());
         server_snapshot = server.clone();
     }
@@ -56,7 +62,7 @@ async fn add(config_path: PathBuf, args: AppAddArgs) -> Result<()> {
     if dry_run {
         print_action("Dry run: app mapping was not saved.");
     } else {
-        apply_proxy(&server_snapshot).await?;
+        apply_proxy(&server_snapshot, app.proxy).await?;
         config.save(&config_path)?;
         print_success("App mapping saved and proxy config applied.");
     }
@@ -103,8 +109,10 @@ async fn remove(config_path: PathBuf, args: AppRemoveArgs) -> Result<()> {
     let dry_run = args.server.dry_run;
     let removed_domain;
     let server_snapshot;
+    let proxy_to_apply;
     {
         let server = config.find_server_mut(&server_name)?;
+        proxy_to_apply = dominant_proxy(server);
         removed_domain = resolve_domain_for_removal(server, args.domain.as_deref())?.to_string();
 
         let previous_len = server.apps.len();
@@ -124,7 +132,7 @@ async fn remove(config_path: PathBuf, args: AppRemoveArgs) -> Result<()> {
     if dry_run {
         print_action("Dry run: app mapping was not removed.");
     } else {
-        apply_proxy(&server_snapshot).await?;
+        apply_proxy(&server_snapshot, proxy_to_apply).await?;
         config.save(&config_path)?;
         print_success("App mapping removed and proxy config applied.");
     }
@@ -190,8 +198,18 @@ fn collect_app_args(server: &Server, args: &AppAddArgs) -> Result<App> {
     })
 }
 
+fn validate_upstream_port(port: u16) -> Result<()> {
+    if port == 0 {
+        bail!(
+            "app port to proxy to must be between 1 and 65535.\nUse the local port your app already listens on, for example `8000`."
+        );
+    }
+
+    Ok(())
+}
+
 fn default_proxy_for_server(server: &Server) -> Option<ProxyType> {
-    server.apps.first().map(|app| app.proxy)
+    server.effective_proxy()
 }
 
 fn select_proxy(theme: &ColorfulTheme) -> ProxyType {
@@ -209,7 +227,10 @@ fn select_proxy(theme: &ColorfulTheme) -> ProxyType {
     }
 }
 
-fn resolve_domain_for_removal<'a>(server: &'a Server, provided: Option<&'a str>) -> Result<&'a str> {
+fn resolve_domain_for_removal<'a>(
+    server: &'a Server,
+    provided: Option<&'a str>,
+) -> Result<&'a str> {
     if let Some(domain) = provided {
         return Ok(domain);
     }
@@ -238,8 +259,7 @@ fn resolve_domain_for_removal<'a>(server: &'a Server, provided: Option<&'a str>)
     Ok(&server.apps[index].domain)
 }
 
-async fn apply_proxy(server: &Server) -> Result<()> {
-    let proxy = dominant_proxy(server);
+async fn apply_proxy(server: &Server, proxy: ProxyType) -> Result<()> {
     let ssh = SshClient::connect(server).await?;
 
     ssh.run("sudo apt update").await?;
@@ -275,5 +295,40 @@ impl From<ProxyValue> for ProxyType {
             ProxyValue::Caddy => ProxyType::Caddy,
             ProxyValue::Nginx => ProxyType::Nginx,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{dominant_proxy, validate_upstream_port};
+    use crate::config::{App, ProxyType, Server};
+
+    fn server_with_apps(apps: Vec<App>) -> Server {
+        Server {
+            name: "prod-1".into(),
+            host: "203.0.113.10".into(),
+            user: "root".into(),
+            port: 22,
+            ssh_key: "/home/root/.ssh/id_ed25519".into(),
+            managed_docker: false,
+            managed_proxy: None,
+            apps,
+        }
+    }
+
+    #[test]
+    fn dominant_proxy_uses_existing_server_proxy() {
+        let server = server_with_apps(vec![App {
+            domain: "api.example.com".into(),
+            upstream_port: 8000,
+            proxy: ProxyType::Nginx,
+        }]);
+
+        assert_eq!(dominant_proxy(&server), ProxyType::Nginx);
+    }
+
+    #[test]
+    fn validate_upstream_port_rejects_zero() {
+        assert!(validate_upstream_port(0).is_err());
     }
 }

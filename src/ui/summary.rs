@@ -18,12 +18,25 @@ pub fn print_init_summary(options: &InitOptions) {
 
     if let Some(proxy_config) = &options.proxy_config {
         println!("  Domain: {}", proxy_config.domain);
-        println!("  Upstream: 127.0.0.1:{}", proxy_config.upstream_port);
+        println!("  Proxy target: 127.0.0.1:{}", proxy_config.upstream_port);
     }
 
     println!();
 
     if options.proxy != ProxyKind::None {
+        if let Some(proxy_config) = &options.proxy_config {
+            println!("{}", style("Before you apply").bold());
+            println!(
+                "  - {} should resolve to this VPS before HTTPS can work.",
+                proxy_config.domain
+            );
+            println!(
+                "  - Your app should already listen on 127.0.0.1:{} or 0.0.0.0:{}.",
+                proxy_config.upstream_port, proxy_config.upstream_port
+            );
+            println!();
+        }
+
         println!("{}", style("Generated proxy config").bold());
         println!("{}", proxy_config_preview(options));
         println!();

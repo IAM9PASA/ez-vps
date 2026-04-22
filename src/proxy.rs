@@ -73,8 +73,7 @@ fn render_nginx_config(server: &Server) -> String {
         return "server {\n    listen 80 default_server;\n    server_name _;\n\n    return 200 'ez-vps is ready';\n}\n".to_string();
     }
 
-    apps
-        .iter()
+    apps.iter()
         .map(|app| render_app_preview(app))
         .collect::<Vec<_>>()
         .join("\n")

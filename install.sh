@@ -5,7 +5,8 @@ PACKAGE_NAME="ez-vps"
 REPO_SLUG="${REPO_SLUG:-}"
 REPO_URL="${REPO_URL:-}"
 VERSION="${VERSION:-latest}"
-INSTALL_DIR="${INSTALL_DIR:-$HOME/.local/bin}"
+INSTALL_DIR="${INSTALL_DIR:-}"
+DEFAULT_INSTALL_DIR="${HOME}/.local/bin"
 FORCE_SOURCE="${FORCE_SOURCE:-false}"
 TMP_DIR=""
 
@@ -23,6 +24,41 @@ need_cmd() {
 
 say() {
   echo "==> $*"
+}
+
+dir_in_path() {
+  case ":$PATH:" in
+    *":$1:"*) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+dir_is_writable() {
+  local dir="$1"
+
+  if [[ -d "${dir}" ]]; then
+    [[ -w "${dir}" ]]
+    return
+  fi
+
+  [[ -w "$(dirname "${dir}")" ]]
+}
+
+resolve_install_dir() {
+  local candidate
+
+  if [[ -n "${INSTALL_DIR}" ]]; then
+    return 0
+  fi
+
+  for candidate in "${HOME}/.local/bin" "${HOME}/bin" "/usr/local/bin"; do
+    if dir_in_path "${candidate}" && dir_is_writable "${candidate}"; then
+      INSTALL_DIR="${candidate}"
+      return 0
+    fi
+  done
+
+  INSTALL_DIR="${DEFAULT_INSTALL_DIR}"
 }
 
 detect_profile() {
@@ -50,11 +86,9 @@ detect_profile() {
 }
 
 ensure_path() {
-  case ":$PATH:" in
-    *":${INSTALL_DIR}:"*)
-      return 0
-      ;;
-  esac
+  if dir_in_path "${INSTALL_DIR}"; then
+    return 0
+  fi
 
   local profile_file export_line
   profile_file="$(detect_profile)"
@@ -118,6 +152,7 @@ release_download_url() {
 install_binary() {
   local binary_path="$1"
 
+  resolve_install_dir
   mkdir -p "${INSTALL_DIR}"
   cp "${binary_path}" "${INSTALL_DIR}/${PACKAGE_NAME}"
   chmod +x "${INSTALL_DIR}/${PACKAGE_NAME}"
@@ -125,8 +160,18 @@ install_binary() {
   say "Installed to ${INSTALL_DIR}/${PACKAGE_NAME}"
   ensure_path
 
+  if dir_in_path "${INSTALL_DIR}"; then
+    hash -r 2>/dev/null || true
+  fi
+
   say "Done"
-  echo "Run: ${PACKAGE_NAME} --help"
+  if dir_in_path "${INSTALL_DIR}"; then
+    echo "Run: ${PACKAGE_NAME} --help"
+  else
+    echo "${PACKAGE_NAME} is available at ${INSTALL_DIR}/${PACKAGE_NAME}"
+    echo "Open a new shell or run:"
+    echo "export PATH=\"${INSTALL_DIR}:\$PATH\""
+  fi
 }
 
 install_from_release() {

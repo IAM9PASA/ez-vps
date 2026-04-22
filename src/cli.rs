@@ -3,7 +3,11 @@ use std::path::PathBuf;
 use clap::{Parser, Subcommand};
 
 #[derive(Debug, Parser)]
-#[command(name = "ez-vps", version, about = "Simple VPS setup and checks over SSH")]
+#[command(
+    name = "ez-vps",
+    version,
+    about = "Simple VPS setup and checks over SSH"
+)]
 pub struct Cli {
     #[arg(long, global = true, default_value = "servers.toml")]
     pub config: PathBuf,
@@ -15,6 +19,8 @@ pub struct Cli {
 #[derive(Debug, Subcommand)]
 pub enum Commands {
     Init(ServerArgs),
+    Update(ServerArgs),
+    Uninstall(UninstallArgs),
     Check(ServerArgs),
     Version(VersionArgs),
     App {
@@ -39,6 +45,15 @@ pub struct ServerArgs {
 
     #[arg(long, default_value_t = false)]
     pub dry_run: bool,
+}
+
+#[derive(Debug, clap::Args)]
+pub struct UninstallArgs {
+    #[command(flatten)]
+    pub server: ServerArgs,
+
+    #[arg(long, default_value_t = false)]
+    pub yes: bool,
 }
 
 #[derive(Debug, clap::Args)]
